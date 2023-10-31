@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <chrono>
 #include <thread>
+#include <iostream>
 
 #include "imgui/imgui.h"
 #include "imgui_impl_glfw_game.h"
@@ -11,11 +12,33 @@
 #include "draw_game.h"
 
 #include "box2d/box2d.h"
+#include "box2d/b2_contact.h"
+#include <set>
 
 // GLFW main window pointer
 GLFWwindow* g_mainWindow = nullptr;
 
 b2World* g_world;
+std::set<b2Body*> g_toDelete;
+
+class CollisionListener : public b2ContactListener {
+public:
+    void BeginContact(b2Contact* contact) override {
+        return;
+        std::cout << "Contact begin" << std::endl;
+        b2Body* bodyA = contact->GetFixtureA()->GetBody();
+        b2Body* bodyB = contact->GetFixtureB()->GetBody();
+        
+        if (bodyA->GetType() == b2_dynamicBody) {
+            g_toDelete.insert(bodyA);
+            g_toDelete.insert(bodyB);
+        }
+    }
+
+    void EndContact(b2Contact* contact) override {
+        std::cout << "Contact end" << std::endl;
+    }
+};
 
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -43,6 +66,23 @@ void MouseButtonCallback(GLFWwindow* window, int32 button, int32 action, int32 m
     // now convert this position to Box2D world coordinates
     b2Vec2 pw = g_camera.ConvertScreenToWorld(ps);
 
+    if (action != GLFW_PRESS) {
+        return;
+    }
+
+    b2PolygonShape shape;
+    shape.SetAsBox(1.0f, 1.0f);
+
+    b2FixtureDef fd;
+    fd.shape = &shape;
+    fd.density = 2.0f;
+    fd.friction = 0.1f;
+
+    b2BodyDef bd;
+    bd.type = b2_dynamicBody;
+    bd.position.Set(pw.x, pw.y);
+    b2Body* body = g_world->CreateBody(&bd);
+    body->CreateFixture(&fd);
 }
 
 int main()
@@ -76,6 +116,8 @@ int main()
     b2Vec2 gravity;
     gravity.Set(0.0f, -10.0f);
     g_world = new b2World(gravity);
+    CollisionListener cl;
+    g_world->SetContactListener(&cl);
 
     // Create debug draw. We will be using the debugDraw visualization to create
     // our games. Debug draw calls all the OpenGL functions for us.
@@ -95,16 +137,37 @@ int main()
     b2Body* box;
     b2PolygonShape box_shape;
     box_shape.SetAsBox(1.0f, 1.0f);
+    
     b2FixtureDef box_fd;
     box_fd.shape = &box_shape;
-    box_fd.density = 20.0f;
+    box_fd.density = 200.0f;
     box_fd.friction = 0.1f;
     b2BodyDef box_bd;
     box_bd.type = b2_dynamicBody;
-    box_bd.position.Set(-5.0f, 11.25f);
+    box_bd.position.Set(-10.0f, 11.25f);
     box = g_world->CreateBody(&box_bd);
     box->CreateFixture(&box_fd);
+    box->SetAngularVelocity(10.0f);
+    box->SetLinearVelocity({ 5.f, 0.f });
 
+    {
+        b2PolygonShape shape;
+        shape.SetAsBox(0.1f, 1.0f);
+
+        b2FixtureDef fd;
+        fd.shape = &shape;
+        fd.density = 2.0f;
+        fd.friction = 0.1f;
+
+        for (int i = 0; i < 10; ++i)
+        {
+            b2BodyDef bd;
+            bd.type = b2_dynamicBody;
+            bd.position.Set(-4.5f + 1.0f * i, 1.0f);
+            b2Body* body = g_world->CreateBody(&bd);
+            body->CreateFixture(&fd);
+        }
+    }
 
     // This is the color of our background in RGB components
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -148,6 +211,11 @@ int main()
         // When we call Step(), we run the simulation for one frame
         float timeStep = 60 > 0.0f ? 1.0f / 60 : float(0.0f);
         g_world->Step(timeStep, 8, 3);
+
+        for (auto* body : g_toDelete) {
+            g_world->DestroyBody(body);
+        }
+        g_toDelete.clear();
 
         // Render everything on the screen
         g_world->DebugDraw();
