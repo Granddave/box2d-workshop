@@ -4,5 +4,5 @@
 rm -rf build
 mkdir build
 cd build
-cmake -DBOX2D_BUILD_DOCS=OFF ..
+cmake -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBOX2D_BUILD_DOCS=OFF ..
 cmake --build .
