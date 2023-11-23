@@ -4,8 +4,6 @@
 #include <stdio.h>
 #include <thread>
 
-#include "GLFW/glfw3.h"
-#include "glad/gl.h"
 #include "imgui/imgui.h"
 #include "imgui_impl_glfw_game.h"
 #include "imgui_impl_opengl3_game.h"
