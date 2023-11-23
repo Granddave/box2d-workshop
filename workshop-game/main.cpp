@@ -1,6 +1,6 @@
 #include <chrono>
 #include <iostream>
-#include <set>
+#include <memory>
 #include <stdio.h>
 #include <thread>
 
@@ -12,235 +12,159 @@
 #include "box2d/box2d.h"
 
 #include "draw_game.h"
+#include "game.hpp"
 
-// GLFW main window pointer
-GLFWwindow* g_mainWindow = nullptr;
+// This is so bad
+static Game* g_game = nullptr;
 
-b2World* g_world;
-std::set<b2Body*> g_toDelete;
-
-class CollisionListener : public b2ContactListener {
-public:
-    void BeginContact(b2Contact* contact) override {
-        return;
-        std::cout << "Contact begin" << std::endl;
-        b2Body* bodyA = contact->GetFixtureA()->GetBody();
-        b2Body* bodyB = contact->GetFixtureB()->GetBody();
-
-        if (bodyA->GetType() == b2_dynamicBody) {
-            g_toDelete.insert(bodyA);
-            g_toDelete.insert(bodyB);
-        }
-    }
-
-    void EndContact(b2Contact* contact) override {
-        std::cout << "Contact end" << std::endl;
-    }
-};
-
-void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     // code for keys here https://www.glfw.org/docs/3.3/group__keys.html
     // and modifiers https://www.glfw.org/docs/3.3/group__mods.html
+    g_game->keyCallback(key, scancode, action, mods);
 }
 
-void MouseMotionCallback(GLFWwindow*, double xd, double yd) {
-    // get the position where the mouse was pressed
-    b2Vec2 ps((float)xd, (float)yd);
-    // now convert this position to Box2D world coordinates
-    b2Vec2 pw = g_camera.ConvertScreenToWorld(ps);
-}
-
-void MouseButtonCallback(GLFWwindow* window, int32 button, int32 action, int32 mods) {
-    // code for mouse button keys https://www.glfw.org/docs/3.3/group__buttons.html
-    // and modifiers https://www.glfw.org/docs/3.3/group__buttons.html
-    // action is either GLFW_PRESS or GLFW_RELEASE
-    double xd, yd;
-    // get the position where the mouse was pressed
-    glfwGetCursorPos(g_mainWindow, &xd, &yd);
-    b2Vec2 ps((float)xd, (float)yd);
-    // now convert this position to Box2D world coordinates
-    b2Vec2 pw = g_camera.ConvertScreenToWorld(ps);
-
-    if (action != GLFW_PRESS) {
-        return;
+class Application {
+public:
+    Application() = default;
+    ~Application() {
+        glfwTerminate();
+        g_debugDraw.Destroy();
+        g_game = nullptr;
     }
 
-    b2PolygonShape shape;
-    shape.SetAsBox(1.0f, 1.0f);
+    bool init() {
+        /**
+         * GLFW
+         */
+        if (glfwInit() == 0) {
+            fprintf(stderr, "Failed to initialize GLFW\n");
+            return false;
+        }
 
-    b2FixtureDef fd;
-    fd.shape = &shape;
-    fd.density = 2.0f;
-    fd.friction = 0.1f;
+        m_mainWindow = glfwCreateWindow(g_camera.m_width, g_camera.m_height, "My game", NULL, NULL);
 
-    b2BodyDef bd;
-    bd.type = b2_dynamicBody;
-    bd.position.Set(pw.x, pw.y);
-    b2Body* body = g_world->CreateBody(&bd);
-    body->CreateFixture(&fd);
-}
+        if (m_mainWindow == NULL) {
+            fprintf(stderr, "Failed to open GLFW g_mainWindow.\n");
+            glfwTerminate();
+            return false;
+        }
+
+        // Set callbacks using GLFW
+        glfwSetKeyCallback(m_mainWindow, keyCallback);
+        glfwMakeContextCurrent(m_mainWindow);
+
+        // Load OpenGL functions using glad
+        int version = gladLoadGL(glfwGetProcAddress);
+
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+        /**
+         * Window/UI
+         *
+         * Create debug draw. We will be using the debugDraw visualization to create
+         * our games. Debug draw calls all the OpenGL functions for us.
+         */
+        g_debugDraw.Create();
+        CreateUI(m_mainWindow, 20.0f /* font size in pixels */);
+
+        /**
+         * Game init
+         */
+        b2Vec2 gravity { 0.f, 0.f };
+        m_world = std::make_shared<b2World>(gravity);
+        m_world->SetDebugDraw(&g_debugDraw);
+
+        m_game.init(m_world);
+        g_game = &m_game;
+
+        return true;
+    }
+
+    void run() {
+        // Control the frame rate. One draw per monitor refresh.
+        std::chrono::duration<double> frameTime(0.0);
+        std::chrono::duration<double> sleepAdjust(0.0);
+
+        // Main application loop
+        while (!glfwWindowShouldClose(m_mainWindow)) {
+            // Use std::chrono to control frame rate. Objective here is to maintain
+            // a steady 60 frames per second (no more, hopefully no less)
+            std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
+
+            glfwGetWindowSize(m_mainWindow, &g_camera.m_width, &g_camera.m_height);
+
+            int bufferWidth, bufferHeight;
+            glfwGetFramebufferSize(m_mainWindow, &bufferWidth, &bufferHeight);
+            glViewport(0, 0, bufferWidth, bufferHeight);
+
+            // Clear previous frame (avoid creates shadows)
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+
+            // Setup ImGui attributes so we can draw text on the screen. Basically
+            // create a window of the size of our viewport.
+            ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+            ImGui::SetNextWindowSize(ImVec2(float(g_camera.m_width), float(g_camera.m_height)));
+            ImGui::SetNextWindowBgAlpha(0.0f);
+            ImGui::Begin("Overlay", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar);
+            ImGui::End();
+
+            // Enable objects to be draw
+            uint32 flags = 0;
+            flags += b2Draw::e_shapeBit;
+            g_debugDraw.SetFlags(flags);
+
+            // When we call Step(), we run the simulation for one frame
+            float timeStep = 60 > 0.0f ? 1.0f / 60 : float(0.0f);
+            m_world->Step(timeStep, 8, 3);
+
+            m_game.update();
+
+            // Render everything on the screen
+            m_world->DebugDraw();
+            g_debugDraw.Flush();
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+            glfwSwapBuffers(m_mainWindow);
+
+            // Process events (mouse and keyboard) and call the functions we
+            // registered before.
+            glfwPollEvents();
+
+            // Throttle to cap at 60 FPS. Which means if it's going to be past
+            // 60FPS, sleeps a while instead of doing more frames.
+            std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
+            std::chrono::duration<double> target(1.0 / 60.0);
+            std::chrono::duration<double> timeUsed = t2 - t1;
+            std::chrono::duration<double> sleepTime = target - timeUsed + sleepAdjust;
+            if (sleepTime > std::chrono::duration<double>(0)) {
+                // Make the framerate not go over by sleeping a little.
+                std::this_thread::sleep_for(sleepTime);
+            }
+            std::chrono::steady_clock::time_point t3 = std::chrono::steady_clock::now();
+            frameTime = t3 - t1;
+
+            // Compute the sleep adjustment using a low pass filter
+            sleepAdjust = 0.9 * sleepAdjust + 0.1 * (target - frameTime);
+        }
+    }
+
+private:
+    GLFWwindow* m_mainWindow = nullptr; // Owned by GLFW
+    std::shared_ptr<b2World> m_world;
+    Game m_game;
+};
 
 int main() {
-
-    // glfw initialization things
-    if (glfwInit() == 0) {
-        fprintf(stderr, "Failed to initialize GLFW\n");
+    Application app;
+    if (!app.init()) {
         return -1;
     }
 
-    g_mainWindow = glfwCreateWindow(g_camera.m_width, g_camera.m_height, "My game", NULL, NULL);
-
-    if (g_mainWindow == NULL) {
-        fprintf(stderr, "Failed to open GLFW g_mainWindow.\n");
-        glfwTerminate();
-        return -1;
-    }
-
-    // Set callbacks using GLFW
-    glfwSetMouseButtonCallback(g_mainWindow, MouseButtonCallback);
-    glfwSetKeyCallback(g_mainWindow, KeyCallback);
-    glfwSetCursorPosCallback(g_mainWindow, MouseMotionCallback);
-
-    glfwMakeContextCurrent(g_mainWindow);
-
-    // Load OpenGL functions using glad
-    int version = gladLoadGL(glfwGetProcAddress);
-
-    // Setup Box2D world and with some gravity
-    b2Vec2 gravity;
-    gravity.Set(0.0f, -10.0f);
-    g_world = new b2World(gravity);
-    CollisionListener cl;
-    g_world->SetContactListener(&cl);
-
-    // Create debug draw. We will be using the debugDraw visualization to create
-    // our games. Debug draw calls all the OpenGL functions for us.
-    g_debugDraw.Create();
-    g_world->SetDebugDraw(&g_debugDraw);
-    CreateUI(g_mainWindow, 20.0f /* font size in pixels */);
-
-    // Some starter objects are created here, such as the ground
-    b2Body* ground;
-    b2EdgeShape ground_shape;
-    ground_shape.SetTwoSided(b2Vec2(-40.0f, 0.0f), b2Vec2(40.0f, 0.0f));
-    b2BodyDef ground_bd;
-    ground = g_world->CreateBody(&ground_bd);
-    ground->CreateFixture(&ground_shape, 0.0f);
-
-    b2Body* box;
-    b2PolygonShape box_shape;
-    box_shape.SetAsBox(1.0f, 1.0f);
-
-    b2FixtureDef box_fd;
-    box_fd.shape = &box_shape;
-    box_fd.density = 200.0f;
-    box_fd.friction = 0.1f;
-    b2BodyDef box_bd;
-    box_bd.type = b2_dynamicBody;
-    box_bd.position.Set(-10.0f, 11.25f);
-    box = g_world->CreateBody(&box_bd);
-    box->CreateFixture(&box_fd);
-    box->SetAngularVelocity(10.0f);
-    box->SetLinearVelocity({ 5.f, 0.f });
-
-    {
-        b2PolygonShape shape;
-        shape.SetAsBox(0.1f, 1.0f);
-
-        b2FixtureDef fd;
-        fd.shape = &shape;
-        fd.density = 2.0f;
-        fd.friction = 0.1f;
-
-        for (int i = 0; i < 10; ++i) {
-            b2BodyDef bd;
-            bd.type = b2_dynamicBody;
-            bd.position.Set(-4.5f + 1.0f * i, 1.0f);
-            b2Body* body = g_world->CreateBody(&bd);
-            body->CreateFixture(&fd);
-        }
-    }
-
-    // This is the color of our background in RGB components
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-
-    // Control the frame rate. One draw per monitor refresh.
-    std::chrono::duration<double> frameTime(0.0);
-    std::chrono::duration<double> sleepAdjust(0.0);
-
-    // Main application loop
-    while (!glfwWindowShouldClose(g_mainWindow)) {
-        // Use std::chrono to control frame rate. Objective here is to maintain
-        // a steady 60 frames per second (no more, hopefully no less)
-        std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
-
-        glfwGetWindowSize(g_mainWindow, &g_camera.m_width, &g_camera.m_height);
-
-        int bufferWidth, bufferHeight;
-        glfwGetFramebufferSize(g_mainWindow, &bufferWidth, &bufferHeight);
-        glViewport(0, 0, bufferWidth, bufferHeight);
-
-        // Clear previous frame (avoid creates shadows)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-
-        // Setup ImGui attributes so we can draw text on the screen. Basically
-        // create a window of the size of our viewport.
-        ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
-        ImGui::SetNextWindowSize(ImVec2(float(g_camera.m_width), float(g_camera.m_height)));
-        ImGui::SetNextWindowBgAlpha(0.0f);
-        ImGui::Begin("Overlay", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar);
-        ImGui::End();
-
-        // Enable objects to be draw
-        uint32 flags = 0;
-        flags += b2Draw::e_shapeBit;
-        g_debugDraw.SetFlags(flags);
-
-        // When we call Step(), we run the simulation for one frame
-        float timeStep = 60 > 0.0f ? 1.0f / 60 : float(0.0f);
-        g_world->Step(timeStep, 8, 3);
-
-        for (auto* body : g_toDelete) {
-            g_world->DestroyBody(body);
-        }
-        g_toDelete.clear();
-
-        // Render everything on the screen
-        g_world->DebugDraw();
-        g_debugDraw.Flush();
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        glfwSwapBuffers(g_mainWindow);
-
-        // Process events (mouse and keyboard) and call the functions we
-        // registered before.
-        glfwPollEvents();
-
-        // Throttle to cap at 60 FPS. Which means if it's going to be past
-        // 60FPS, sleeps a while instead of doing more frames.
-        std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
-        std::chrono::duration<double> target(1.0 / 60.0);
-        std::chrono::duration<double> timeUsed = t2 - t1;
-        std::chrono::duration<double> sleepTime = target - timeUsed + sleepAdjust;
-        if (sleepTime > std::chrono::duration<double>(0)) {
-            // Make the framerate not go over by sleeping a little.
-            std::this_thread::sleep_for(sleepTime);
-        }
-        std::chrono::steady_clock::time_point t3 = std::chrono::steady_clock::now();
-        frameTime = t3 - t1;
-
-        // Compute the sleep adjustment using a low pass filter
-        sleepAdjust = 0.9 * sleepAdjust + 0.1 * (target - frameTime);
-    }
-
-    // Terminate the program if it reaches here
-    glfwTerminate();
-    g_debugDraw.Destroy();
-    delete g_world;
+    app.run();
 
     return 0;
 }
