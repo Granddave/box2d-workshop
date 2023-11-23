@@ -1,19 +1,19 @@
-
-#include <stdio.h>
 #include <chrono>
-#include <thread>
 #include <iostream>
+#include <set>
+#include <stdio.h>
+#include <thread>
 
+#include "GLFW/glfw3.h"
+#include "glad/gl.h"
 #include "imgui/imgui.h"
 #include "imgui_impl_glfw_game.h"
 #include "imgui_impl_opengl3_game.h"
-#include "glad/gl.h"
-#include "GLFW/glfw3.h"
-#include "draw_game.h"
 
-#include "box2d/box2d.h"
 #include "box2d/b2_contact.h"
-#include <set>
+#include "box2d/box2d.h"
+
+#include "draw_game.h"
 
 // GLFW main window pointer
 GLFWwindow* g_mainWindow = nullptr;
@@ -28,7 +28,7 @@ public:
         std::cout << "Contact begin" << std::endl;
         b2Body* bodyA = contact->GetFixtureA()->GetBody();
         b2Body* bodyB = contact->GetFixtureB()->GetBody();
-        
+
         if (bodyA->GetType() == b2_dynamicBody) {
             g_toDelete.insert(bodyA);
             g_toDelete.insert(bodyB);
@@ -40,22 +40,19 @@ public:
     }
 };
 
-void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
+void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     // code for keys here https://www.glfw.org/docs/3.3/group__keys.html
     // and modifiers https://www.glfw.org/docs/3.3/group__mods.html
 }
 
-void MouseMotionCallback(GLFWwindow*, double xd, double yd)
-{
+void MouseMotionCallback(GLFWwindow*, double xd, double yd) {
     // get the position where the mouse was pressed
     b2Vec2 ps((float)xd, (float)yd);
     // now convert this position to Box2D world coordinates
     b2Vec2 pw = g_camera.ConvertScreenToWorld(ps);
 }
 
-void MouseButtonCallback(GLFWwindow* window, int32 button, int32 action, int32 mods)
-{
+void MouseButtonCallback(GLFWwindow* window, int32 button, int32 action, int32 mods) {
     // code for mouse button keys https://www.glfw.org/docs/3.3/group__buttons.html
     // and modifiers https://www.glfw.org/docs/3.3/group__buttons.html
     // action is either GLFW_PRESS or GLFW_RELEASE
@@ -85,8 +82,7 @@ void MouseButtonCallback(GLFWwindow* window, int32 button, int32 action, int32 m
     body->CreateFixture(&fd);
 }
 
-int main()
-{
+int main() {
 
     // glfw initialization things
     if (glfwInit() == 0) {
@@ -125,7 +121,6 @@ int main()
     g_world->SetDebugDraw(&g_debugDraw);
     CreateUI(g_mainWindow, 20.0f /* font size in pixels */);
 
-
     // Some starter objects are created here, such as the ground
     b2Body* ground;
     b2EdgeShape ground_shape;
@@ -137,7 +132,7 @@ int main()
     b2Body* box;
     b2PolygonShape box_shape;
     box_shape.SetAsBox(1.0f, 1.0f);
-    
+
     b2FixtureDef box_fd;
     box_fd.shape = &box_shape;
     box_fd.density = 200.0f;
@@ -159,8 +154,7 @@ int main()
         fd.density = 2.0f;
         fd.friction = 0.1f;
 
-        for (int i = 0; i < 10; ++i)
-        {
+        for (int i = 0; i < 10; ++i) {
             b2BodyDef bd;
             bd.type = b2_dynamicBody;
             bd.position.Set(-4.5f + 1.0f * i, 1.0f);
@@ -243,7 +237,6 @@ int main()
 
         // Compute the sleep adjustment using a low pass filter
         sleepAdjust = 0.9 * sleepAdjust + 0.1 * (target - frameTime);
-
     }
 
     // Terminate the program if it reaches here
