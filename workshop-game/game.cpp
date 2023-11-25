@@ -12,25 +12,15 @@
  */
 
 void ContactListener::BeginContact(b2Contact* contact) {
-    b2Body* bodyA = contact->GetFixtureA()->GetBody();
-    b2Body* bodyB = contact->GetFixtureB()->GetBody();
-
-    if (isGoal(bodyA, bodyB)) {
-        std::cerr << "Goal!" << std::endl;
+    if (m_callback) {
+        m_callback(contact->GetFixtureA()->GetBody(), contact->GetFixtureB()->GetBody(), true);
     }
 }
 
 void ContactListener::EndContact(b2Contact* contact) {
-    b2Body* bodyA = contact->GetFixtureA()->GetBody();
-    b2Body* bodyB = contact->GetFixtureB()->GetBody();
-
-    if (isGoal(bodyA, bodyB)) {
-        std::cerr << "Leaving goal" << std::endl;
+    if (m_callback) {
+        m_callback(contact->GetFixtureA()->GetBody(), contact->GetFixtureB()->GetBody(), false);
     }
-}
-
-bool ContactListener::isGoal(b2Body* bodyA, b2Body* bodyB) const {
-    return (bodyA == m_triangle && bodyB == m_goal) || (bodyA == m_goal && bodyB == m_triangle);
 }
 
 bool Game::init(std::shared_ptr<b2World> world) {
@@ -38,14 +28,27 @@ bool Game::init(std::shared_ptr<b2World> world) {
     m_world->SetGravity({ 0.f, 0.f });
     m_world->SetContactListener(&m_contactListener);
 
+    m_contactListener.registerCallbackFn(std::bind(&Game::collisionCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+
     createTrack();
     createTriangle();
     createGoal();
 
-    m_contactListener.m_triangle = m_triangle;
-    m_contactListener.m_goal = m_goal;
-
     return true;
+}
+
+void Game::collisionCallback(b2Body* bodyA, b2Body* bodyB, bool hasContact) {
+    if (isGoal(bodyA, bodyB)) {
+        if (hasContact) {
+            std::cout << "Goal!" << std::endl;
+        } else {
+            std::cout << "Starting timer" << std::endl;
+        }
+    }
+}
+
+bool Game::isGoal(b2Body* bodyA, b2Body* bodyB) const {
+    return (bodyA == m_triangle && bodyB == m_goal) || (bodyA == m_goal && bodyB == m_triangle);
 }
 
 void Game::createTrack() {

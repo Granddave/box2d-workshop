@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <set>
 
@@ -8,12 +9,13 @@
 
 class ContactListener : public b2ContactListener {
 public:
-    b2Body* m_triangle;
-    b2Body* m_goal;
+    void registerCallbackFn(std::function<void(b2Body*, b2Body*, bool)> callback) { m_callback = callback; }
+
 private:
     void BeginContact(b2Contact* contact) override;
     void EndContact(b2Contact* contact) override;
-    bool isGoal(b2Body* bodyA, b2Body* bodyB) const;
+
+    std::function<void(b2Body*, b2Body*, bool)> m_callback;
 };
 
 class Game {
@@ -30,6 +32,9 @@ private:
     void createTriangle();
     void createGoal();
     void resetTriangle();
+
+    void collisionCallback(b2Body* bodyA, b2Body* bodyB, bool hasContact);
+    bool isGoal(b2Body* bodyA, b2Body* bodyB) const;
 
     std::shared_ptr<b2World> m_world;
     std::set<b2Body*> m_toDelete;
