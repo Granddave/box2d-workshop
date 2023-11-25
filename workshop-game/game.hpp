@@ -6,6 +6,16 @@
 #include "GLFW/glfw3.h"
 #include "box2d/box2d.h"
 
+class ContactListener : public b2ContactListener {
+public:
+    b2Body* m_triangle;
+    b2Body* m_goal;
+private:
+    void BeginContact(b2Contact* contact) override;
+    void EndContact(b2Contact* contact) override;
+    bool isGoal(b2Body* bodyA, b2Body* bodyB) const;
+};
+
 class Game {
 public:
     Game() = default;
@@ -24,6 +34,7 @@ private:
     std::shared_ptr<b2World> m_world;
     std::set<b2Body*> m_toDelete;
 
+    ContactListener m_contactListener;
     b2Body* m_triangle;
     b2Body* m_goal;
 

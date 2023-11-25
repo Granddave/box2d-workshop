@@ -11,13 +11,39 @@
  * - Lap time
  */
 
+void ContactListener::BeginContact(b2Contact* contact) {
+    b2Body* bodyA = contact->GetFixtureA()->GetBody();
+    b2Body* bodyB = contact->GetFixtureB()->GetBody();
+
+    if (isGoal(bodyA, bodyB)) {
+        std::cerr << "Goal!" << std::endl;
+    }
+}
+
+void ContactListener::EndContact(b2Contact* contact) {
+    b2Body* bodyA = contact->GetFixtureA()->GetBody();
+    b2Body* bodyB = contact->GetFixtureB()->GetBody();
+
+    if (isGoal(bodyA, bodyB)) {
+        std::cerr << "Leaving goal" << std::endl;
+    }
+}
+
+bool ContactListener::isGoal(b2Body* bodyA, b2Body* bodyB) const {
+    return (bodyA == m_triangle && bodyB == m_goal) || (bodyA == m_goal && bodyB == m_triangle);
+}
+
 bool Game::init(std::shared_ptr<b2World> world) {
     m_world = world;
     m_world->SetGravity({ 0.f, 0.f });
+    m_world->SetContactListener(&m_contactListener);
 
     createTrack();
     createTriangle();
     createGoal();
+
+    m_contactListener.m_triangle = m_triangle;
+    m_contactListener.m_goal = m_goal;
 
     return true;
 }
