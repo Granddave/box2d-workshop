@@ -16,10 +16,18 @@
 
 // This is so bad
 static Game* g_game = nullptr;
+static bool g_running = true;
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     // code for keys here https://www.glfw.org/docs/3.3/group__keys.html
     // and modifiers https://www.glfw.org/docs/3.3/group__mods.html
+
+    if (key == GLFW_KEY_Q && action == GLFW_PRESS) {
+        g_running = false;
+        std::cerr << "Bye bye!" << std::endl;
+        return;
+    }
+
     g_game->keyCallback(key, scancode, action, mods);
 }
 
@@ -87,6 +95,10 @@ public:
 
         // Main application loop
         while (!glfwWindowShouldClose(m_mainWindow)) {
+            if (!g_running) {
+                break;
+            }
+
             // Use std::chrono to control frame rate. Objective here is to maintain
             // a steady 60 frames per second (no more, hopefully no less)
             std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
