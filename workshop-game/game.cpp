@@ -149,32 +149,58 @@ void Game::imGuiUpdate() {
     }
 }
 
+bool usingJoystick(float joystick[4]) {
+    return (std::abs(joystick[0]) > 0.00f || std::abs(joystick[1]) > 0.00f || std::abs(joystick[2]) > 0.00f || std::abs(joystick[3]) > 0.00f);
+}
+
 void Game::update() {
+    bool hasJoystick = glfwJoystickPresent(GLFW_JOYSTICK_1) != 0;
+    float joystick[4] = { 0.f };
+    bool joystickRestartButtonPressed = false;
+    if (hasJoystick) {
+        int count;
+        const float* axes = glfwGetJoystickAxes(GLFW_JOYSTICK_1, &count);
+
+        if (count >= 4) {
+            joystick[0] = std::abs(axes[0]) < 0.01f ? 0 : axes[0];
+            joystick[1] = std::abs(axes[1]) < 0.01f ? 0 : axes[1];
+            joystick[2] = std::abs(axes[2]) < 0.01f ? 0 : axes[2];
+            joystick[3] = std::abs(axes[3]) < 0.01f ? 0 : axes[3];
+        }
+
+        joystickRestartButtonPressed = glfwGetJoystickButtons(GLFW_JOYSTICK_1, &count)[7] == GLFW_PRESS;
+    }
+
     // Torque
     constexpr float torque = 100.0f;
     float torqueToApply = 0.f;
-    if (m_keyPressed[GLFW_KEY_A] || m_keyPressed[GLFW_KEY_LEFT]) {
-        torqueToApply += torque;
-    }
-    if (m_keyPressed[GLFW_KEY_D] || m_keyPressed[GLFW_KEY_RIGHT]) {
-        torqueToApply -= torque;
+    if (usingJoystick(joystick)) {
+        torqueToApply += -joystick[0] * torque;
+    } else {
+        if (m_keyPressed[GLFW_KEY_A] || m_keyPressed[GLFW_KEY_LEFT]) {
+            torqueToApply += torque;
+        }
+        if (m_keyPressed[GLFW_KEY_D] || m_keyPressed[GLFW_KEY_RIGHT]) {
+            torqueToApply -= torque;
+        }
     }
     m_triangle->ApplyTorque(torqueToApply, true);
 
     // Thrust
-    constexpr float thrust = 1200.0f;
-    if (m_keyPressed[GLFW_KEY_W] || m_keyPressed[GLFW_KEY_UP]) {
-        // Approximate bottom center in local coordinates of the triangle
-        // Assuming the height is along the y-axis and width along the x-axis
-        b2Vec2 bottomCenterLocal(0.0f, 0.0f);
-
-        // Convert the bottom center to world coordinates
-        b2Vec2 bottomCenterWorld = m_triangle->GetWorldPoint(bottomCenterLocal);
-
+    constexpr float thrustFactor = 1200.0f;
+    // Approximate bottom center in local coordinates of the triangle
+    // Assuming the height is along the y-axis and width along the x-axis
+    b2Vec2 bottomCenterLocal(0.0f, 0.0f);
+    // Convert the bottom center to world coordinates
+    b2Vec2 bottomCenterWorld = m_triangle->GetWorldPoint(bottomCenterLocal);
+    if (usingJoystick(joystick)) {
+        float thrust = std::max(-joystick[3], 0.0f) * thrustFactor;
         m_triangle->ApplyForceToCenter(m_triangle->GetWorldVector({ 0.f, thrust }), true);
+    } else if (m_keyPressed[GLFW_KEY_W] || m_keyPressed[GLFW_KEY_UP]) {
+        m_triangle->ApplyForceToCenter(m_triangle->GetWorldVector({ 0.f, thrustFactor }), true);
     }
 
-    if (m_keyPressed[GLFW_KEY_R]) {
+    if (m_keyPressed[GLFW_KEY_R] || joystickRestartButtonPressed) {
         resetTriangle();
     }
 }
