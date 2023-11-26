@@ -162,7 +162,7 @@ void Game::update() {
     m_triangle->ApplyTorque(torqueToApply, true);
 
     // Thrust
-    constexpr float thrust = 1000.0f;
+    constexpr float thrust = 1200.0f;
     if (m_keyPressed[GLFW_KEY_W] || m_keyPressed[GLFW_KEY_UP]) {
         // Approximate bottom center in local coordinates of the triangle
         // Assuming the height is along the y-axis and width along the x-axis
