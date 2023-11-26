@@ -1,8 +1,10 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
 #include <memory>
 #include <set>
+#include <vector>
 
 #include "GLFW/glfw3.h"
 #include "box2d/box2d.h"
@@ -24,6 +26,7 @@ public:
     ~Game() = default;
 
     bool init(std::shared_ptr<b2World>);
+    void imGuiUpdate();
     void update();
     void keyCallback(int key, int scancode, int action, int mods);
 
@@ -35,6 +38,7 @@ private:
 
     void collisionCallback(b2Body* bodyA, b2Body* bodyB, bool hasContact);
     bool isGoal(b2Body* bodyA, b2Body* bodyB) const;
+    void restartLapTimer();
 
     std::shared_ptr<b2World> m_world;
     std::set<b2Body*> m_toDelete;
@@ -42,6 +46,10 @@ private:
     ContactListener m_contactListener;
     b2Body* m_triangle;
     b2Body* m_goal;
+
+    std::chrono::time_point<std::chrono::steady_clock> m_lapTimer;
+    bool m_lapTimerStarted { false };
+    std::vector<int> m_lapTimes;
 
     bool m_keyPressed[GLFW_KEY_LAST] = { false };
 };

@@ -122,6 +122,7 @@ public:
             ImGui::SetNextWindowSize(ImVec2(float(g_camera.m_width), float(g_camera.m_height)));
             ImGui::SetNextWindowBgAlpha(0.0f);
             ImGui::Begin("Overlay", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar);
+            m_game.imGuiUpdate();
             ImGui::End();
 
             // Enable objects to be draw

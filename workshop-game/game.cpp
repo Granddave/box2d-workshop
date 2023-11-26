@@ -1,14 +1,15 @@
 #include "game.hpp"
 
+#include <algorithm>
 #include <iostream>
 #include <math.h>
+#include <sstream>
+
+#include "imgui/imgui.h"
 
 /**
  * Game featuers:
  * - Penalty time
- * - Time per lap
- * - Lap counter
- * - Lap time
  */
 
 void ContactListener::BeginContact(b2Contact* contact) {
@@ -35,20 +36,6 @@ bool Game::init(std::shared_ptr<b2World> world) {
     createGoal();
 
     return true;
-}
-
-void Game::collisionCallback(b2Body* bodyA, b2Body* bodyB, bool hasContact) {
-    if (isGoal(bodyA, bodyB)) {
-        if (hasContact) {
-            std::cout << "Goal!" << std::endl;
-        } else {
-            std::cout << "Starting timer" << std::endl;
-        }
-    }
-}
-
-bool Game::isGoal(b2Body* bodyA, b2Body* bodyB) const {
-    return (bodyA == m_triangle && bodyB == m_goal) || (bodyA == m_goal && bodyB == m_triangle);
 }
 
 void Game::createTrack() {
@@ -146,6 +133,21 @@ void Game::resetTriangle() {
     m_triangle->SetTransform({ 0.f, 2.5f }, M_PI / -2.0f);
     m_triangle->SetLinearVelocity({ 0.f, 0.f });
     m_triangle->SetAngularVelocity(0.f);
+
+    m_lapTimerStarted = false;
+}
+
+void Game::imGuiUpdate() {
+    ImGui::Text("Highscores:");
+    for (auto laptime : m_lapTimes) {
+        ImGui::Text("- %.2fs", (float)(laptime) / 1000.0f);
+    }
+
+    if (m_lapTimerStarted) {
+        auto now = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lapTimer);
+        ImGui::Text("Lap time: %ldms", duration.count());
+    }
 }
 
 void Game::update() {
@@ -180,4 +182,33 @@ void Game::update() {
 
 void Game::keyCallback(int key, int scancode, int action, int mods) {
     m_keyPressed[key] = action != GLFW_RELEASE;
+}
+
+void Game::collisionCallback(b2Body* bodyA, b2Body* bodyB, bool hasContact) {
+    if (isGoal(bodyA, bodyB)) {
+        if (!hasContact) {
+            restartLapTimer();
+        }
+    }
+}
+
+bool Game::isGoal(b2Body* bodyA, b2Body* bodyB) const {
+    return (bodyA == m_triangle && bodyB == m_goal) || (bodyA == m_goal && bodyB == m_triangle);
+}
+
+void Game::restartLapTimer() {
+    if (m_lapTimerStarted) {
+        auto now = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lapTimer);
+        auto lapTime = duration.count();
+
+        m_lapTimes.push_back(lapTime);
+        std::sort(m_lapTimes.begin(), m_lapTimes.end());
+        if (m_lapTimes.size() > 5) {
+            m_lapTimes.pop_back();
+        }
+    }
+
+    m_lapTimer = std::chrono::steady_clock::now();
+    m_lapTimerStarted = true;
 }
