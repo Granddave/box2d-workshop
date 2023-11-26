@@ -47,9 +47,19 @@ private:
     b2Body* m_triangle;
     b2Body* m_goal;
 
+    struct Lap {
+        int lapTime_ms { 0 };
+        int penalties { 0 };
+
+        int getLapTime() const { return lapTime_ms + penalties * 1000; }
+        bool operator<(const Lap& rhs) const { return getLapTime() < rhs.getLapTime(); }
+    } m_penalties;
+
     std::chrono::time_point<std::chrono::steady_clock> m_lapTimer;
+    std::chrono::time_point<std::chrono::steady_clock> m_lastPenalty;
     bool m_lapTimerStarted { false };
-    std::vector<int> m_lapTimes;
+    std::vector<Lap> m_laps;
+    Lap m_currentLap {};
 
     bool m_keyPressed[GLFW_KEY_LAST] = { false };
 };

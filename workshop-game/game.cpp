@@ -7,11 +7,6 @@
 
 #include "imgui/imgui.h"
 
-/**
- * Game featuers:
- * - Penalty time
- */
-
 void ContactListener::BeginContact(b2Contact* contact) {
     if (m_callback) {
         m_callback(contact->GetFixtureA()->GetBody(), contact->GetFixtureB()->GetBody(), true);
@@ -135,13 +130,14 @@ void Game::resetTriangle() {
     m_triangle->SetAngularVelocity(0.f);
 
     m_lapTimerStarted = false;
+    m_currentLap = Lap();
 }
 
 void Game::imGuiUpdate() {
-    if (!m_lapTimes.empty()) {
+    if (!m_laps.empty()) {
         ImGui::Text("Best lap times:");
-        for (auto laptime : m_lapTimes) {
-            ImGui::Text("- %.2fs", (float)(laptime) / 1000.0f);
+        for (auto lap : m_laps) {
+            ImGui::Text("- %.2fs (%d penalties)", (float)(lap.getLapTime()) / 1000.0f, lap.penalties);
         }
         ImGui::Text(" ");
     }
@@ -149,7 +145,7 @@ void Game::imGuiUpdate() {
     if (m_lapTimerStarted) {
         auto now = std::chrono::steady_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lapTimer);
-        ImGui::Text("Lap time: %ldms", duration.count());
+        ImGui::Text("Lap time: %ldms, penalties: %d", duration.count(), m_currentLap.penalties);
     }
 }
 
@@ -192,6 +188,20 @@ void Game::collisionCallback(b2Body* bodyA, b2Body* bodyB, bool hasContact) {
         if (!hasContact) {
             restartLapTimer();
         }
+    } else {
+        if (hasContact) {
+            // Triangle against wall
+
+            // Check when the last penalty was given
+            // If it was less than 1 second ago, don't give another one
+            auto now = std::chrono::steady_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lastPenalty);
+            if (duration.count() > 1000) {
+                m_lastPenalty = std::chrono::steady_clock::now();
+                m_currentLap.penalties += 1;
+            } else {
+            }
+        }
     }
 }
 
@@ -203,13 +213,16 @@ void Game::restartLapTimer() {
     if (m_lapTimerStarted) {
         auto now = std::chrono::steady_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lapTimer);
-        auto lapTime = duration.count();
+        m_currentLap.lapTime_ms = duration.count();
 
-        m_lapTimes.push_back(lapTime);
-        std::sort(m_lapTimes.begin(), m_lapTimes.end());
-        if (m_lapTimes.size() > 5) {
-            m_lapTimes.pop_back();
+        m_laps.push_back(m_currentLap);
+
+        std::sort(m_laps.begin(), m_laps.end());
+        if (m_laps.size() > 5) {
+            m_laps.pop_back();
         }
+
+        m_currentLap = Lap();
     }
 
     m_lapTimer = std::chrono::steady_clock::now();
