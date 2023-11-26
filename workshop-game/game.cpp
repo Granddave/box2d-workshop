@@ -125,7 +125,7 @@ void Game::createGoal() {
 
     b2FixtureDef fixtureDef;
     fixtureDef.shape = &shape;
-    fixtureDef.isSensor = true; // Make this a sensor
+    fixtureDef.isSensor = true;
     m_goal->CreateFixture(&fixtureDef);
 }
 
@@ -138,9 +138,12 @@ void Game::resetTriangle() {
 }
 
 void Game::imGuiUpdate() {
-    ImGui::Text("Highscores:");
-    for (auto laptime : m_lapTimes) {
-        ImGui::Text("- %.2fs", (float)(laptime) / 1000.0f);
+    if (!m_lapTimes.empty()) {
+        ImGui::Text("Best lap times:");
+        for (auto laptime : m_lapTimes) {
+            ImGui::Text("- %.2fs", (float)(laptime) / 1000.0f);
+        }
+        ImGui::Text(" ");
     }
 
     if (m_lapTimerStarted) {
