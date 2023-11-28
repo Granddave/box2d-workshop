@@ -188,11 +188,6 @@ void Game::update() {
 
     // Thrust
     constexpr float thrustFactor = 1200.0f;
-    // Approximate bottom center in local coordinates of the triangle
-    // Assuming the height is along the y-axis and width along the x-axis
-    b2Vec2 bottomCenterLocal(0.0f, 0.0f);
-    // Convert the bottom center to world coordinates
-    b2Vec2 bottomCenterWorld = m_triangle->GetWorldPoint(bottomCenterLocal);
     if (usingJoystick(joystick)) {
         float thrust = std::max(-joystick[3], 0.0f) * thrustFactor;
         m_triangle->ApplyForceToCenter(m_triangle->GetWorldVector({ 0.f, thrust }), true);
