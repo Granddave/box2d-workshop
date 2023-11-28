@@ -189,7 +189,7 @@ void Game::update() {
     // Thrust
     constexpr float thrustFactor = 1200.0f;
     if (usingJoystick(joystick)) {
-        float thrust = std::max(-joystick[3], 0.0f) * thrustFactor;
+        const float thrust = std::max(-joystick[3], 0.0f) * thrustFactor;
         m_triangle->ApplyForceToCenter(m_triangle->GetWorldVector({ 0.f, thrust }), true);
     } else if (m_keyPressed[GLFW_KEY_W] || m_keyPressed[GLFW_KEY_UP]) {
         m_triangle->ApplyForceToCenter(m_triangle->GetWorldVector({ 0.f, thrustFactor }), true);
