@@ -220,7 +220,6 @@ void Game::collisionCallback(b2Body* bodyA, b2Body* bodyB, bool hasContact) {
             if (duration.count() > 1000) {
                 m_lastPenalty = std::chrono::steady_clock::now();
                 m_currentLap.penalties += 1;
-            } else {
             }
         }
     }
